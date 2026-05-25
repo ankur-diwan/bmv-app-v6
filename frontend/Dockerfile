@@ -65,10 +65,14 @@ RUN echo 'server { \
 # Remove default nginx config
 RUN rm -f /etc/nginx/conf.d/default.conf.default
 
-# Create non-root user
+# Create non-root user and set up permissions
 RUN addgroup -g 1000 appuser && \
     adduser -D -u 1000 -G appuser appuser && \
-    chown -R appuser:appuser /usr/share/nginx/html /var/cache/nginx /var/run /var/log/nginx
+    chown -R appuser:appuser /usr/share/nginx/html && \
+    chown -R appuser:appuser /var/cache/nginx && \
+    chown -R appuser:appuser /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R appuser:appuser /var/run/nginx.pid
 
 USER appuser
 
