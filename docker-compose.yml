@@ -31,6 +31,7 @@ services:
       - WATSONX_API_KEY=${WATSONX_API_KEY}
       - WATSONX_PROJECT_ID=${WATSONX_PROJECT_ID}
       - WATSONX_URL=${WATSONX_URL:-https://us-south.ml.cloud.ibm.com}
+      - VALIDATION_TEMP_DIR=/app/temp/cos_validation
     ports:
       - "8000:8000"
     volumes:

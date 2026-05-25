@@ -99,7 +99,7 @@ function App() {
       const response = await axios.get(`${API_BASE_URL}/api/v1/validate/${validationId}`);
       console.log('Validation status:', response.data);
       setValidationStatus(response.data);
-      
+
       if (response.data.status === 'completed') {
         fetchValidationResults();
       }
@@ -155,14 +155,14 @@ function App() {
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const requestPayload = {
         model_config: modelConfig,
         generate_document: true,
         register_governance: true
       };
-      
+
       // Add uploaded CSV file paths if available
       if (uploadedDatasets && Object.keys(uploadedDatasets).length > 0) {
         requestPayload.uploaded_files = {
@@ -172,9 +172,9 @@ function App() {
       } else {
         console.log('No uploaded datasets found, backend will use sample data');
       }
-      
+
       const response = await axios.post(`${API_BASE_URL}/api/v1/validate`, requestPayload);
-      
+
       console.log('Validation started:', response.data);
       setValidationId(response.data.validation_id);
       handleNext();
@@ -189,18 +189,18 @@ function App() {
   const handleDownloadDocument = async () => {
     try {
       setError(null);
-      
+
       // Check if validationId is available
       if (!validationId) {
         setError('No validation ID available. Please run a validation first.');
         return;
       }
-      
+
       const response = await axios.get(
         `${API_BASE_URL}/api/download-report/${validationId}`,
         { responseType: 'blob' }
       );
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -219,10 +219,10 @@ function App() {
     console.log('[UPLOAD DEBUG] Documents uploaded:', documents);
     console.log('[UPLOAD DEBUG] Datasets mapped:', datasets);
     console.log('[UPLOAD DEBUG] Timestamp:', new Date().toISOString());
-    
+
     setUploadedDocuments(documents);
     setUploadedDatasets(datasets);
-    
+
     // VISIBLE DEBUG: Show alert with datasets info
     if (datasets && Object.keys(datasets).length > 0) {
       alert(`✅ Datasets uploaded successfully!\nTrain: ${datasets.train ? '✓' : '✗'}\nTest: ${datasets.test ? '✓' : '✗'}\nOOT: ${datasets.oot ? '✓' : '✗'}`);
@@ -494,7 +494,7 @@ function App() {
       <Typography variant="h5" gutterBottom>
         Validation Complete
       </Typography>
-      
+
       <Alert severity="success" sx={{ mb: 3 }}>
         <Typography variant="body1">
           Validation completed successfully! The comprehensive SR 11-7 validation report is ready.
@@ -544,66 +544,68 @@ function App() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom align="center">
-          Banking Model Validation System
-        </Typography>
-        <Typography variant="subtitle1" align="center" color="text.secondary" paragraph>
-          Automated SR 11-7 Compliance Validation powered by IBM watsonx
-        </Typography>
+    <>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Paper elevation={3} sx={{ p: 4 }}>
+          <Typography variant="h3" component="h1" gutterBottom align="center">
+            Banking Model Validation System
+          </Typography>
+          <Typography variant="subtitle1" align="center" color="text.secondary" paragraph>
+            Automated SR 11-7 Compliance Validation powered by IBM watsonx
+          </Typography>
 
-        <Divider sx={{ my: 3 }} />
+          <Divider sx={{ my: 3 }} />
 
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-        {renderStepContent(activeStep)}
+          {renderStepContent(activeStep)}
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-          <Button
-            disabled={activeStep === 0 || activeStep === 3}
-            onClick={handleBack}
-          >
-            Back
-          </Button>
-          <Box>
-            {activeStep === steps.length - 1 ? (
-              <Button onClick={handleReset} variant="contained">
-                Start New Validation
-              </Button>
-            ) : activeStep === 2 ? (
-              <Button
-                variant="contained"
-                onClick={handleSubmit}
-                disabled={loading || !isStepValid()}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Start Validation'}
-              </Button>
-            ) : (activeStep === 0 || activeStep === 1) ? (
-              <Button
-                variant="contained"
-                onClick={handleNext}
-                disabled={!isStepValid()}
-              >
-                Next
-              </Button>
-            ) : null}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+            <Button
+              disabled={activeStep === 0 || activeStep === 3}
+              onClick={handleBack}
+            >
+              Back
+            </Button>
+            <Box>
+              {activeStep === steps.length - 1 ? (
+                <Button onClick={handleReset} variant="contained">
+                  Start New Validation
+                </Button>
+              ) : activeStep === 2 ? (
+                <Button
+                  variant="contained"
+                  onClick={handleSubmit}
+                  disabled={loading || !isStepValid()}
+                >
+                  {loading ? <CircularProgress size={24} /> : 'Start Validation'}
+                </Button>
+              ) : (activeStep === 0 || activeStep === 1) ? (
+                <Button
+                  variant="contained"
+                  onClick={handleNext}
+                  disabled={!isStepValid()}
+                >
+                  Next
+                </Button>
+              ) : null}
+            </Box>
           </Box>
-        </Box>
-      </Paper>
-    </Container>
+        </Paper>
+      </Container>
+    </>
   );
 }
 

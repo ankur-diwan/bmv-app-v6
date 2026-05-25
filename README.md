@@ -31,11 +31,14 @@ This system automates the validation of banking models (credit risk, fraud detec
          │
     ┌────┴────┐
     │         │
-┌───▼──┐  ┌──▼────┐
-│ DB   │  │watsonx│
-│ PG   │  │ AI    │
-└──────┘  └───────┘
+┌───▼──────┐  ┌──▼────────┐
+│  Cloud   │  │ watsonx   │
+│  Object  │  │    AI     │
+│ Storage  │  │           │
+└──────────┘  └───────────┘
 ```
+
+**Note:** This application uses IBM Cloud Object Storage (COS) for all data persistence. PostgreSQL is NOT required.
 
 ## 🚀 Quick Start
 
@@ -43,9 +46,11 @@ This system automates the validation of banking models (credit risk, fraud detec
 
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL 14+
 - IBM Cloud account with watsonx.ai access
+- IBM Cloud Object Storage (COS) bucket
 - Docker (optional, for containerized deployment)
+
+**Note:** PostgreSQL is NOT required - the application uses IBM Cloud Object Storage.
 
 ### Environment Variables
 
@@ -57,8 +62,11 @@ WATSONX_API_KEY=your_ibm_cloud_api_key
 WATSONX_PROJECT_ID=your_watsonx_project_id
 WATSONX_URL=https://us-south.ml.cloud.ibm.com
 
-# Database Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/banking_validation
+# IBM Cloud Object Storage Configuration
+COS_API_KEY=your_cos_api_key
+COS_RESOURCE_INSTANCE_ID=your_cos_resource_instance_id
+COS_ENDPOINT_URL=https://s3.us-south.cloud-object-storage.appdomain.cloud
+COS_BUCKET_NAME=bankvalidationapp
 
 # Application Configuration
 ENVIRONMENT=development
@@ -100,49 +108,70 @@ docker build -t banking-validation-frontend ./frontend
 
 ## ☁️ IBM Cloud Code Engine Deployment
 
-### Prerequisites
+This application is **production-ready** for IBM Cloud Code Engine deployment!
 
-- IBM Cloud CLI installed
-- Code Engine plugin installed
-- IBM Cloud account with Code Engine and watsonx access
+### 📋 Quick Deployment Guide
 
-### Deploy Backend
+**Total Time:** ~40 minutes | **Difficulty:** Intermediate
 
-```bash
-# Login to IBM Cloud
-ibmcloud login --sso
+#### Required Services:
+- ✅ IBM watsonx.ai (AI-powered validation)
+- ✅ IBM Cloud Object Storage (Document storage)
+- ✅ IBM Cloud Code Engine (Application hosting)
+- ❌ PostgreSQL (NOT required)
 
-# Target Code Engine project
-ibmcloud ce project select --name your-project
+#### Deployment Steps:
 
-# Create application from source
-ibmcloud ce application create \
-  --name banking-validation-backend \
-  --build-source https://github.com/YOUR_USERNAME/YOUR_REPO \
-  --build-context-dir backend \
-  --port 8080 \
-  --min-scale 1 \
-  --max-scale 2 \
-  --cpu 1 \
-  --memory 2G \
-  --env WATSONX_API_KEY=your_api_key \
-  --env WATSONX_PROJECT_ID=your_project_id \
-  --env WATSONX_URL=https://us-south.ml.cloud.ibm.com \
-  --env DATABASE_URL=your_database_url \
-  --env ENVIRONMENT=production \
-  --env LOG_LEVEL=INFO
-```
+1. **Prepare Prerequisites** (5 min)
+   - Create COS bucket
+   - Get watsonx.ai credentials
+   - Push code to GitHub
 
-### Deploy Frontend
+2. **Create Code Engine Project** (2 min)
+   - Create project in IBM Cloud Console
+   - Select region (e.g., us-south)
 
-```bash
-ibmcloud ce application create \
-  --name banking-validation-frontend \
-  --build-source https://github.com/YOUR_USERNAME/YOUR_REPO \
-  --build-context-dir frontend \
-  --port 8080 \
-  --env VITE_API_URL=https://your-backend-url.appdomain.cloud
-```
+3. **Create Secrets** (5 min)
+   - `watsonx-credentials` (API key, Project ID)
+   - `cos-credentials` (API key, Instance ID, Bucket)
+
+4. **Deploy Backend** (10 min)
+   - Create application from GitHub
+   - Configure build and runtime
+   - Bind secrets
+
+5. **Deploy Frontend** (10 min)
+   - Create application from GitHub
+   - Set backend URL as build argument
+   - Deploy
+
+6. **Configure & Test** (8 min)
+   - Update CORS settings
+   - Test integration
+   - Verify COS storage
+
+### 📚 Detailed Documentation
+
+- **[Quick Start Guide](QUICK_START_DEPLOYMENT.md)** - Fast deployment in 40 minutes
+- **[Comprehensive Guide](CODE_ENGINE_DEPLOYMENT_GUIDE.md)** - Detailed step-by-step instructions
+- **[Deployment Checklist](DEPLOYMENT_CHECKLIST.md)** - Complete verification checklist
+- **[Deployment Summary](DEPLOYMENT_SUMMARY.md)** - Architecture and configuration overview
+
+### 🔑 Key Configuration Files
+
+- `backend/Dockerfile` - Production-ready backend container
+- `frontend/Dockerfile` - Production-ready frontend container
+- `.env.codeengine` - Environment variables template
+- `backend/.dockerignore` - Optimized build context
+- `frontend/.dockerignore` - Optimized build context
+
+### 💡 Deployment Features
+
+- ✅ **Stateless Architecture** - No database required
+- ✅ **Auto-scaling** - Scale to zero when idle
+- ✅ **Health Checks** - Built-in monitoring
+- ✅ **Security** - Non-root containers, HTTPS by default
+- ✅ **Cost-Optimized** - Pay only for what you use (~$0-70/month)
 
 ## 📚 API Documentation
 
@@ -174,11 +203,16 @@ npm test
 
 ## 📖 Documentation
 
-- [Deployment Guide](DEPLOYMENT_GUIDE.md)
-- [Code Engine Deployment](CODE_ENGINE_DEPLOYMENT.md)
-- [SR 11-7 Framework](docs/SR-11-7-FRAMEWORK.md)
-- [Supported Models](docs/SUPPORTED_MODELS.md)
-- [MCP Integration](docs/MCP_INTEGRATION.md)
+### Deployment Guides
+- **[Quick Start Deployment](QUICK_START_DEPLOYMENT.md)** - Deploy in 40 minutes
+- **[Comprehensive Deployment Guide](CODE_ENGINE_DEPLOYMENT_GUIDE.md)** - Detailed instructions
+- **[Deployment Checklist](DEPLOYMENT_CHECKLIST.md)** - Step-by-step verification
+- **[Deployment Summary](DEPLOYMENT_SUMMARY.md)** - Architecture overview
+
+### Technical Documentation
+- [SR 11-7 Framework](docs/SR-11-7-FRAMEWORK.md) (if exists)
+- [Supported Models](docs/SUPPORTED_MODELS.md) (if exists)
+- [MCP Integration](docs/MCP_INTEGRATION.md) (if exists)
 
 ## 🔒 Security
 

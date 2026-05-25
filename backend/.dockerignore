@@ -1,53 +1,74 @@
-# Git
-.git
-.gitignore
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Environment
 .env
 .env.local
 .env.*.local
 
-# Python
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg
-*.egg-info
-.pytest_cache
-.mypy_cache
-.ruff_cache
-
-# IDE
-.vscode
-.idea
-*.swp
-*.swo
-*~
+# Logs
+*.log
+logs/
 
 # Documentation
 *.md
-!README.md
+docs/
 
-# Tests
+# Git
+.git/
+.gitignore
+
+# Output files (these should be generated at runtime)
+output/
+temp/
+
+# Test files
 tests/
 test_*.py
 *_test.py
 
-# Output
-output/
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Node (if any)
-node_modules
-
-# Temporary
-tmp/
-temp/
-*.tmp
+# Development files
+*.pid
+backend.pid
+start.sh
+start_servers.sh

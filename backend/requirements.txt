@@ -8,17 +8,18 @@ pydantic-settings==2.1.0
 ibm-watsonx-ai==0.2.6
 ibm-watson-machine-learning>=1.0.349
 ibm-cloud-sdk-core>=3.20.0
+ibm-cos-sdk==2.13.4
 
-# Database
-psycopg2-binary==2.9.9
-sqlalchemy==2.0.25
-alembic==1.13.1
+# Database (Optional - not currently used, COS is used for storage)
+# psycopg2-binary==2.9.9
+# sqlalchemy==2.0.25
+# alembic==1.13.1
 
 # Data Processing
-pandas==2.1.4
-numpy==1.26.3
-scikit-learn==1.4.0
-scipy==1.11.4
+pandas>=2.2.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+scipy>=1.11.0
 
 # Model Libraries
 xgboost==2.0.3
