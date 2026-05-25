@@ -23,8 +23,10 @@ This guide provides step-by-step instructions for deploying the Banking Model Va
 ### Required IBM Cloud Services
 - IBM Cloud Account (with appropriate permissions)
 - IBM watsonx.ai instance
-- IBM Cloud Databases for PostgreSQL (recommended) or external PostgreSQL database
+- IBM Cloud Object Storage (COS) bucket
 - GitHub account with repository access
+
+**Note:** PostgreSQL database is NOT required - the application uses IBM Cloud Object Storage for all data persistence.
 
 ### Required Tools
 - Web browser for IBM Cloud Console
@@ -33,9 +35,9 @@ This guide provides step-by-step instructions for deploying the Banking Model Va
 
 ### Cost Considerations
 - Code Engine: Pay-per-use (free tier available)
-- Databases for PostgreSQL: Starting from ~$30/month
+- Cloud Object Storage: ~$0-20/month (based on storage and requests)
 - watsonx.ai: Based on usage
-- Cloud Object Storage (optional): Pay-per-use
+- **Total estimated cost: ~$0-70/month**
 
 ---
 
@@ -66,46 +68,46 @@ git push -u origin main
 
 Review and update `.env.codeengine` file with your actual values:
 - watsonx API credentials
-- Database connection string
+- Cloud Object Storage credentials
 - Security keys
 
 **Important**: Never commit actual credentials to GitHub. Use Code Engine secrets instead.
 
----
+### 3. Create Cloud Object Storage Bucket
 
-## Database Setup
-
-### Option 1: IBM Cloud Databases for PostgreSQL (Recommended)
-
-1. **Create Database Instance**
+1. **Create COS Instance** (if you don't have one)
    - Go to IBM Cloud Catalog
-   - Search for "Databases for PostgreSQL"
+   - Search for "Object Storage"
    - Click "Create"
+   - Choose a plan (Lite plan available for testing)
+   - Click "Create"
+
+2. **Create Bucket**
+   - Go to your COS instance
+   - Click "Create bucket"
+   - Choose "Customize your bucket"
    - Configure:
-     - Name: `banking-validation-db`
-     - Region: Same as Code Engine (e.g., us-south)
-     - Resource group: Default or your preferred group
-     - Plan: Standard (minimum recommended)
-   - Click "Create"
+     - Bucket name: `bankvalidationapp` (or your choice)
+     - Resiliency: Regional
+     - Location: Same as Code Engine (e.g., us-south)
+     - Storage class: Standard
+   - Click "Create bucket"
 
-2. **Get Connection Details**
-   - Wait for provisioning (5-10 minutes)
-   - Go to Service Credentials
+3. **Get COS Credentials**
+   - Go to "Service credentials"
    - Click "New credential"
-   - Copy the connection string
-   - Format: `postgresql://username:password@host:port/database?sslmode=require`
+   - Enable "Include HMAC Credential" (for presigned URLs)
+   - Copy:
+     - `apikey` → COS_API_KEY
+     - `resource_instance_id` → COS_RESOURCE_INSTANCE_ID
+     - `endpoints` → Find your regional endpoint (e.g., https://s3.us-south.cloud-object-storage.appdomain.cloud)
+     - `cos_hmac_keys.access_key_id` → COS_ACCESS_KEY_ID (optional)
+     - `cos_hmac_keys.secret_access_key` → COS_SECRET_ACCESS_KEY (optional)
 
-3. **Initialize Database**
-   - Connect using psql or pgAdmin
-   - Run the initialization script from `database/init.sql`
-
-### Option 2: External PostgreSQL Database
-
-If using an external database:
-- Ensure it's accessible from IBM Cloud
-- Use SSL/TLS connection
-- Configure firewall rules to allow Code Engine IPs
-- Get connection string in format: `postgresql://user:pass@host:port/db?sslmode=require`
+4. **Note Bucket Details**
+   - Bucket name: `bankvalidationapp`
+   - Endpoint URL: `https://s3.us-south.cloud-object-storage.appdomain.cloud`
+   - Region: `us-south` (or your chosen region)
 
 ---
 
@@ -170,8 +172,15 @@ If using an external database:
      - `WATSONX_PROJECT_ID` = your_project_id
      - `WATSONX_SPACE_ID` = your_space_id
    
-   - Create secret named `database-credentials`:
-     - `DATABASE_URL` = your_postgresql_connection_string
+   - Create secret named `cos-credentials`:
+     - `COS_API_KEY` = your_cos_api_key
+     - `COS_RESOURCE_INSTANCE_ID` = your_cos_resource_instance_id
+     - `COS_ENDPOINT_URL` = https://s3.us-south.cloud-object-storage.appdomain.cloud
+     - `COS_BUCKET_NAME` = bankvalidationapp
+   
+   - Create secret named `cos-hmac-credentials` (optional, for presigned URLs):
+     - `COS_ACCESS_KEY_ID` = your_hmac_access_key
+     - `COS_SECRET_ACCESS_KEY` = your_hmac_secret_key
 
 6. **Configure Domain**
    - Domain mappings: Use default Code Engine domain
@@ -288,14 +297,25 @@ After frontend deployment, update backend CORS settings:
      - `WATSONX_SPACE_ID`: your_space_id
    - Click "Create"
 
-3. **Create Database Credentials Secret**
-   - Name: `database-credentials`
+3. **Create COS Credentials Secret**
+   - Name: `cos-credentials`
    - Type: Generic secret
-   - Add key-value pair:
-     - `DATABASE_URL`: your_postgresql_connection_string
+   - Add key-value pairs:
+     - `COS_API_KEY`: your_cos_api_key
+     - `COS_RESOURCE_INSTANCE_ID`: your_cos_resource_instance_id
+     - `COS_ENDPOINT_URL`: https://s3.us-south.cloud-object-storage.appdomain.cloud
+     - `COS_BUCKET_NAME`: bankvalidationapp
    - Click "Create"
 
-4. **Create Security Keys Secret**
+4. **Create COS HMAC Credentials Secret** (Optional, for presigned URLs)
+   - Name: `cos-hmac-credentials`
+   - Type: Generic secret
+   - Add key-value pairs:
+     - `COS_ACCESS_KEY_ID`: your_hmac_access_key
+     - `COS_SECRET_ACCESS_KEY`: your_hmac_secret_key
+   - Click "Create"
+
+5. **Create Security Keys Secret**
    - Name: `security-keys`
    - Type: Generic secret
    - Add key-value pairs:
@@ -382,13 +402,24 @@ curl -X POST https://YOUR-BACKEND-URL/api/v1/validate \
 - Ensure port 8080 is exposed
 - Check health endpoint configuration
 
-#### Issue: Database Connection Fails
+#### Issue: COS Connection Fails
 
 **Solution:**
-- Verify DATABASE_URL format
-- Check database credentials
-- Ensure database is accessible from Code Engine
-- Verify SSL/TLS settings
+- Verify COS_API_KEY is correct
+- Check COS_RESOURCE_INSTANCE_ID is correct
+- Ensure COS_BUCKET_NAME exists
+- Verify bucket is in same region as Code Engine
+- Check bucket access permissions
+- Review backend logs for COS errors
+
+#### Issue: File Upload Fails
+
+**Solution:**
+- Verify COS credentials are valid
+- Check bucket exists and is accessible
+- Ensure bucket has write permissions
+- Verify CORS settings on bucket (if needed)
+- Check backend logs for detailed error messages
 
 #### Issue: Frontend Can't Connect to Backend
 
@@ -570,7 +601,7 @@ If issues occur after update:
 
 ### IBM Cloud Documentation
 - [Code Engine Documentation](https://cloud.ibm.com/docs/codeengine)
-- [Databases for PostgreSQL](https://cloud.ibm.com/docs/databases-for-postgresql)
+- [Cloud Object Storage Documentation](https://cloud.ibm.com/docs/cloud-object-storage)
 - [watsonx.ai Documentation](https://cloud.ibm.com/docs/watsonx)
 
 ### Support
@@ -611,7 +642,8 @@ Before seeking support, verify:
 
 - [ ] All environment variables are set correctly
 - [ ] Secrets are created and bound to applications
-- [ ] Database is accessible and initialized
+- [ ] COS bucket is created and accessible
+- [ ] COS credentials are valid
 - [ ] watsonx credentials are valid
 - [ ] Build completed successfully
 - [ ] Application is running (check status)
@@ -620,6 +652,7 @@ Before seeking support, verify:
 - [ ] Network connectivity is working
 - [ ] CORS is configured correctly
 - [ ] Frontend can reach backend
+- [ ] File uploads work to COS
 - [ ] Resource limits are sufficient
 
 ---
