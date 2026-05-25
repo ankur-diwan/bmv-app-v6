@@ -20,9 +20,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create output and temp directories with proper permissions
-RUN mkdir -p /app/output/documents /app/temp/cos_validation && \
-    chmod -R 777 /app/output /app/temp
+# Create output, temp, and uploads directories with proper permissions
+RUN mkdir -p /app/output/documents /app/temp/cos_validation /app/uploads && \
+    chmod -R 777 /app/output /app/temp /app/uploads
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \

@@ -799,6 +799,98 @@ async def upload_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading document: {str(e)}")
 
+@app.post("/api/upload-documents")
+async def upload_documents_batch(
+    files: List[UploadFile] = File(...)
+):
+    """
+    Upload multiple documents at once (batch upload)
+    
+    Args:
+        files: List of files to upload
+    
+    Returns:
+        Upload results with document metadata and datasets info
+    """
+    try:
+        uploaded_docs = []
+        datasets = {
+            "train": None,
+            "test": None,
+            "oot": None
+        }
+        errors = []
+        
+        for file in files:
+            try:
+                # Validate file
+                validation_result = document_analyzer.validate_file(file.filename, file.size)
+                if not validation_result["valid"]:
+                    errors.append(f"{file.filename}: {validation_result['error']}")
+                    continue
+                
+                # Generate unique document ID
+                doc_id = f"DOC_{datetime.utcnow().timestamp()}_{file.filename}"
+                
+                # Save file
+                file_path = UPLOAD_DIR / f"{doc_id}_{file.filename}"
+                with file_path.open("wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                
+                # Analyze document
+                analysis = document_analyzer.analyze_document(str(file_path))
+                
+                # Extract metadata
+                metadata = document_analyzer.extract_metadata(str(file_path))
+                
+                # Store document info
+                doc_info = {
+                    "document_id": doc_id,
+                    "filename": file.filename,
+                    "file_path": str(file_path),
+                    "file_size": file.size,
+                    "file_type": validation_result["file_type"],
+                    "upload_time": datetime.utcnow().isoformat(),
+                    "metadata": metadata,
+                    "analysis": analysis
+                }
+                
+                uploaded_documents[doc_id] = doc_info
+                uploaded_docs.append(doc_info)
+                
+                # Identify dataset type from filename
+                filename_lower = file.filename.lower()
+                if 'train' in filename_lower:
+                    datasets["train"] = doc_id
+                elif 'test' in filename_lower:
+                    datasets["test"] = doc_id
+                elif 'oot' in filename_lower:
+                    datasets["oot"] = doc_id
+                
+            except Exception as e:
+                errors.append(f"{file.filename}: {str(e)}")
+        
+        # Broadcast update
+        await broadcast_update({
+            "type": "documents_uploaded",
+            "data": {
+                "count": len(uploaded_docs),
+                "documents": [{"document_id": d["document_id"], "filename": d["filename"]} for d in uploaded_docs]
+            }
+        })
+        
+        return {
+            "success": True,
+            "documents": uploaded_docs,
+            "datasets": datasets,
+            "errors": errors if errors else None,
+            "message": f"Successfully uploaded {len(uploaded_docs)} of {len(files)} files"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error uploading documents: {str(e)}")
+
+
 
 @app.get("/api/v1/documents")
 async def list_documents(
