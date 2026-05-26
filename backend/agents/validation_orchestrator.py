@@ -7,6 +7,9 @@ import asyncio
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from loguru import logger
+import pandas as pd
+import tempfile
+import os
 
 from wxo.watsonx_client import WatsonxClient
 from data_generators.scorecard_data_generator import ScorecardDataGenerator
@@ -29,6 +32,11 @@ class ValidationOrchestratorAgent:
         self.data_generator = ScorecardDataGenerator()
         self.validation_state = {}
         self.document_analyzer = None
+        self.cos_client = None
+        
+    def set_cos_client(self, cos_client):
+        """Set COS client for loading uploaded datasets"""
+        self.cos_client = cos_client
         
     async def orchestrate_validation(
         self,
@@ -189,8 +197,36 @@ class ValidationOrchestratorAgent:
         self,
         model_config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Generate synthetic validation datasets"""
+        """Load uploaded datasets from COS or generate synthetic data"""
         
+        # Try to load from COS first
+        if self.cos_client:
+            try:
+                logger.info("Checking for uploaded datasets in COS...")
+                latest_files = self.cos_client.get_latest_files_by_type()
+                
+                if latest_files.get('train') and latest_files.get('test'):
+                    logger.info("✓ Found uploaded datasets in COS, loading...")
+                    datasets = {
+                        "train": self._load_csv_from_cos(latest_files['train']['key']),
+                        "test": self._load_csv_from_cos(latest_files['test']['key']),
+                        "out_of_time": self._load_csv_from_cos(latest_files['oot']['key']) if latest_files.get('oot') else None
+                    }
+                    
+                    # If OOT is missing, use test data as fallback
+                    if datasets["out_of_time"] is None:
+                        logger.warning("⚠ No OOT dataset found, using test data as fallback")
+                        datasets["out_of_time"] = datasets["test"].copy()
+                    
+                    logger.info(f"✓ Loaded datasets - Train: {len(datasets['train'])}, Test: {len(datasets['test'])}, OOT: {len(datasets['out_of_time'])}")
+                    return datasets
+                else:
+                    logger.info("⚠ No complete dataset set found in COS (need train + test)")
+            except Exception as e:
+                logger.warning(f"⚠ Could not load from COS: {str(e)}")
+        
+        # Fallback to synthetic data generation
+        logger.info("⚠ Generating synthetic data (no uploaded files available)")
         datasets = self.data_generator.generate_validation_dataset(
             scorecard_type=model_config["scorecard_type"],
             product_type=model_config["product_type"],
@@ -200,6 +236,34 @@ class ValidationOrchestratorAgent:
         )
         
         return datasets
+    
+    def _load_csv_from_cos(self, cos_key: str) -> pd.DataFrame:
+        """Load CSV file from COS bucket"""
+        try:
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as tmp:
+                tmp_path = tmp.name
+            
+            # Download from COS
+            success = self.cos_client.download_file(cos_key, tmp_path)
+            if not success:
+                raise Exception(f"Failed to download {cos_key} from COS")
+            
+            # Load CSV
+            df = pd.read_csv(tmp_path)
+            
+            # Clean up temp file
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+            
+            logger.info(f"✓ Loaded {len(df)} rows from {cos_key}")
+            return df
+            
+        except Exception as e:
+            logger.error(f"✗ Error loading CSV from COS ({cos_key}): {str(e)}")
+            raise
     
     async def _validate_data_quality(
         self,

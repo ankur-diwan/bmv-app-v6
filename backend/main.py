@@ -19,6 +19,7 @@ from wxo.orchestrate_client import WatsonxOrchestrateClient
 from agents.validation_orchestrator import ValidationOrchestratorAgent
 from agents.mlops_agent import MLOpsAgent
 from validation.document_generator import SR117DocumentGenerator
+from utils.cos_client import get_cos_client
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -42,6 +43,7 @@ governance_client = None
 orchestrate_client = None
 mlops_agent = None
 orchestrator = None
+cos_client = None
 
 # WebSocket connections for real-time updates
 active_connections: List[WebSocket] = []
@@ -127,7 +129,7 @@ class CustomTestRequest(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup"""
-    global watsonx_client, governance_client, orchestrate_client, mlops_agent, orchestrator
+    global watsonx_client, governance_client, orchestrate_client, mlops_agent, orchestrator, cos_client
     
     try:
         # Initialize watsonx client
@@ -144,6 +146,15 @@ async def startup_event():
         
         # Initialize orchestrator
         orchestrator = ValidationOrchestratorAgent(watsonx_client)
+        
+        # Initialize COS client (optional)
+        try:
+            cos_client = get_cos_client()
+            orchestrator.set_cos_client(cos_client)
+            print("  - IBM Cloud Object Storage: Connected")
+        except Exception as cos_error:
+            print(f"  - IBM Cloud Object Storage: Not configured ({str(cos_error)})")
+            cos_client = None
         
         print("✓ Banking Model Validation System (Enhanced) initialized successfully")
         print("  - watsonx.ai: Connected")
@@ -706,6 +717,7 @@ from fastapi import UploadFile, File
 from validation.document_analyzer import DocumentAnalyzer
 import shutil
 from pathlib import Path
+from loguru import logger
 
 # Initialize document analyzer
 document_analyzer = DocumentAnalyzer()
@@ -832,10 +844,30 @@ async def upload_documents_batch(
                 # Generate unique document ID
                 doc_id = f"DOC_{datetime.utcnow().timestamp()}_{file.filename}"
                 
-                # Save file
+                # Save file locally
                 file_path = UPLOAD_DIR / f"{doc_id}_{file.filename}"
                 with file_path.open("wb") as buffer:
                     shutil.copyfileobj(file.file, buffer)
+                
+                # Upload to COS if available
+                cos_key = None
+                if cos_client:
+                    try:
+                        cos_key = f"uploads/{doc_id}_{file.filename}"
+                        with open(file_path, 'rb') as f:
+                            success = cos_client.upload_file(
+                                f,
+                                cos_key,
+                                content_type=file.content_type
+                            )
+                        if success:
+                            logger.info(f"✓ Uploaded to COS: {cos_key}")
+                        else:
+                            logger.warning(f"⚠ COS upload failed for: {file.filename}")
+                            cos_key = None
+                    except Exception as cos_error:
+                        logger.error(f"✗ COS upload error for {file.filename}: {str(cos_error)}")
+                        cos_key = None
                 
                 # Analyze document
                 analysis = document_analyzer.analyze_document(str(file_path))
@@ -852,20 +884,21 @@ async def upload_documents_batch(
                     "file_type": validation_result["file_type"],
                     "upload_time": datetime.utcnow().isoformat(),
                     "metadata": metadata,
-                    "analysis": analysis
+                    "analysis": analysis,
+                    "cos_key": cos_key  # Add COS key if uploaded
                 }
                 
                 uploaded_documents[doc_id] = doc_info
                 uploaded_docs.append(doc_info)
                 
-                # Identify dataset type from filename
+                # Identify dataset type from filename and store COS key
                 filename_lower = file.filename.lower()
                 if 'train' in filename_lower:
-                    datasets["train"] = doc_id
+                    datasets["train"] = {"doc_id": doc_id, "cos_key": cos_key, "file_path": str(file_path)}
                 elif 'test' in filename_lower:
-                    datasets["test"] = doc_id
+                    datasets["test"] = {"doc_id": doc_id, "cos_key": cos_key, "file_path": str(file_path)}
                 elif 'oot' in filename_lower:
-                    datasets["oot"] = doc_id
+                    datasets["oot"] = {"doc_id": doc_id, "cos_key": cos_key, "file_path": str(file_path)}
                 
             except Exception as e:
                 errors.append(f"{file.filename}: {str(e)}")
