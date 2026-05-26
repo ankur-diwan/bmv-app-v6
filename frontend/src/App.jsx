@@ -197,7 +197,7 @@ function App() {
       }
 
       const response = await axios.get(
-        `${API_BASE_URL}/api/download-report/${validationId}`,
+        `${API_BASE_URL}/api/v1/validate/${validationId}/document`,
         { responseType: 'blob' }
       );
 
