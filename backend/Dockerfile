@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements from backend directory
-COPY backend/requirements.txt .
+# Copy requirements file
+COPY requirements.txt .
 
 # Install Python packaging tools first
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code from backend directory
-COPY backend/ .
+# Copy application code
+COPY . .
 
 # Create output, temp, and uploads directories with proper permissions
 RUN mkdir -p /app/output/documents /app/temp/cos_validation /app/uploads && \
