@@ -21,10 +21,30 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
+# Install envsubst for environment variable substitution
+RUN apk add --no-cache gettext
+
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create nginx configuration
+# Copy nginx configuration template
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+
+# Create startup script for environment variable substitution
+RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
+    echo 'set -e' >> /docker-entrypoint.sh && \
+    echo '' >> /docker-entrypoint.sh && \
+    echo '# Set default backend URL if not provided' >> /docker-entrypoint.sh && \
+    echo 'export BACKEND_URL=${BACKEND_URL:-http://localhost:8080}' >> /docker-entrypoint.sh && \
+    echo '' >> /docker-entrypoint.sh && \
+    echo '# Substitute environment variables in nginx config' >> /docker-entrypoint.sh && \
+    echo 'envsubst '"'"'$BACKEND_URL'"'"' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf' >> /docker-entrypoint.sh && \
+    echo '' >> /docker-entrypoint.sh && \
+    echo '# Start nginx' >> /docker-entrypoint.sh && \
+    echo 'exec nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
+
+# Legacy inline config (kept as fallback, will be overwritten by template)
 RUN echo 'server { \
     listen 8080; \
     server_name _; \
@@ -60,10 +80,7 @@ RUN echo 'server { \
         return 200 "healthy\n"; \
         add_header Content-Type text/plain; \
     } \
-}' > /etc/nginx/conf.d/default.conf
-
-# Remove default nginx config
-RUN rm -f /etc/nginx/conf.d/default.conf.default
+}' > /etc/nginx/conf.d/default.conf.backup
 
 # Create non-root user and set up permissions
 RUN addgroup -g 1000 appuser && \
@@ -83,5 +100,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Use custom entrypoint for environment variable substitution
+ENTRYPOINT ["/docker-entrypoint.sh"]

@@ -5,7 +5,10 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// API Base URL configuration
+// In production (Code Engine), requests go through nginx proxy at /api/
+// In development, use VITE_API_URL environment variable
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Create axios instance with default config
 const apiClient = axios.create({
